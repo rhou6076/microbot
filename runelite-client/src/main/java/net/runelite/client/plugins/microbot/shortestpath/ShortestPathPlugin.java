@@ -272,42 +272,6 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
             return;
         }
 
-        if ("travelToCustomLocation".equals(event.getKey())) {
-            boolean travelToCustomLocation = Boolean.parseBoolean(event.getNewValue());
-            if (travelToCustomLocation) {
-                handleTravelToCustomLocation();
-            } else {
-                stopTraveling();
-            }
-        }
-
-        if ("travelToBank".equals(event.getKey())) {
-            boolean travelToBank = Boolean.parseBoolean(event.getNewValue());
-            if (travelToBank) {
-                handleTravelToBank();
-            } else {
-                stopTraveling();
-            }
-        }
-
-        if ("travelToSlayerMaster".equals(event.getKey())) {
-            boolean travelToSlayerMaster = Boolean.parseBoolean(event.getNewValue());
-            if (travelToSlayerMaster) {
-                handleTravelToSlayerMaster();
-            } else {
-                stopTraveling();
-            }
-        }
-
-        if ("travelToFarming".equals(event.getKey())) {
-            boolean travelToFarming = Boolean.parseBoolean(event.getNewValue());
-            if (travelToFarming) {
-                handleTravelToFarmingLocation();
-            } else {
-                stopTraveling();
-            }
-        }
-
         if ("drawDebugPanel".equals(event.getKey())) {
             if (config.drawDebugPanel()) {
                 overlayManager.add(debugOverlayPanel);
