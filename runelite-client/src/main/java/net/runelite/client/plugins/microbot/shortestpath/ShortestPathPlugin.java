@@ -25,6 +25,8 @@ import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.plugins.microbot.Microbot;
+import net.runelite.client.plugins.microbot.shortestpath.enums.Banks;
+import net.runelite.client.plugins.microbot.shortestpath.enums.SlayerMasters;
 import net.runelite.client.plugins.microbot.shortestpath.pathfinder.CollisionMap;
 import net.runelite.client.plugins.microbot.shortestpath.pathfinder.Pathfinder;
 import net.runelite.client.plugins.microbot.shortestpath.pathfinder.PathfinderConfig;
@@ -32,7 +34,9 @@ import net.runelite.client.plugins.microbot.shortestpath.pathfinder.SplitFlagMap
 import net.runelite.client.plugins.microbot.util.player.Rs2Player;
 import net.runelite.client.plugins.microbot.util.tile.Rs2Tile;
 import net.runelite.client.plugins.microbot.util.walker.Rs2Walker;
+import net.runelite.client.ui.ClientToolbar;
 import net.runelite.client.ui.JagexColors;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.worldmap.WorldMapOverlay;
 import net.runelite.client.ui.overlay.worldmap.WorldMapPoint;
@@ -85,6 +89,9 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     public ShortestPathConfig config;
 
     @Inject
+    private ConfigManager configManager;
+
+    @Inject
     private OverlayManager overlayManager;
 
     @Inject
@@ -100,6 +107,9 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     private PathMapTooltipOverlay pathMapTooltipOverlay;
 
     @Inject
+    private ClientToolbar clientToolbar;
+
+    @Inject
     private DebugOverlayPanel debugOverlayPanel;
 
     @Inject
@@ -112,6 +122,7 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     private WorldMapOverlay worldMapOverlay;
 
     private Point lastMenuOpenedPoint;
+    private ShortestPathPanel panel;
     @Getter
     @Setter
     private static WorldMapPoint marker;
@@ -119,6 +130,7 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     @Getter
     @Setter
     private static WorldPoint lastLocation = new WorldPoint(0, 0, 0);
+    private NavigationButton navButton;
     private MenuEntry lastClick;
     private Shape minimapClipFixed;
     private Shape minimapClipResizeable;
@@ -162,6 +174,24 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
 
         pathfinderConfig = new PathfinderConfig(map, transports, restrictions, client, config);
 
+        panel = injector.getInstance(ShortestPathPanel.class);
+
+        BufferedImage icon;
+        try {
+            icon = ImageUtil.loadImageResource(ShortestPathPlugin.class, "/net/runelite/client/plugins/shortestpath/icon.png");
+        } catch (IllegalArgumentException e) {
+            icon = null;
+        }
+
+        navButton = NavigationButton.builder()
+                .tooltip("Web Walker")
+                .icon(icon)
+                .priority(20)
+                .panel(panel)
+                .build();
+
+        clientToolbar.addNavigation(navButton);
+
         Rs2Walker.setConfig(config);
 
         overlayManager.add(pathOverlay);
@@ -184,6 +214,7 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
         overlayManager.remove(pathMapTooltipOverlay);
         overlayManager.remove(debugOverlayPanel);
         keyManager.unregisterKeyListener(this);
+        clientToolbar.removeNavigation(navButton);
         exit();
     }
 
@@ -239,6 +270,42 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     public void onConfigChanged(ConfigChanged event) {
         if (!CONFIG_GROUP.equals(event.getGroup())) {
             return;
+        }
+
+        if ("travelToCustomLocation".equals(event.getKey())) {
+            boolean travelToCustomLocation = Boolean.parseBoolean(event.getNewValue());
+            if (travelToCustomLocation) {
+                handleTravelToCustomLocation();
+            } else {
+                stopTraveling();
+            }
+        }
+
+        if ("travelToBank".equals(event.getKey())) {
+            boolean travelToBank = Boolean.parseBoolean(event.getNewValue());
+            if (travelToBank) {
+                handleTravelToBank();
+            } else {
+                stopTraveling();
+            }
+        }
+
+        if ("travelToSlayerMaster".equals(event.getKey())) {
+            boolean travelToSlayerMaster = Boolean.parseBoolean(event.getNewValue());
+            if (travelToSlayerMaster) {
+                handleTravelToSlayerMaster();
+            } else {
+                stopTraveling();
+            }
+        }
+
+        if ("travelToFarming".equals(event.getKey())) {
+            boolean travelToFarming = Boolean.parseBoolean(event.getNewValue());
+            if (travelToFarming) {
+                handleTravelToFarmingLocation();
+            } else {
+                stopTraveling();
+            }
         }
 
         if ("drawDebugPanel".equals(event.getKey())) {
@@ -404,6 +471,41 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
 
         if (entry.getType() != MenuAction.WALK) {
             lastClick = entry;
+        }
+    }
+
+    public void handleTravelToCustomLocation() {
+        WorldPoint customLocation = panel.getCustomLocation();
+        if (customLocation != null) {
+            Microbot.log("Web walking starting. Traveling to Custom Location (" + customLocation.getX() + ", " + customLocation.getY() + ", " + customLocation.getPlane() + ").");
+            Rs2Walker.walkTo(customLocation);
+        }
+    }
+
+    public void handleTravelToBank() {
+        Banks selectedBank = panel.getSelectedBank();
+        WorldPoint bankLocation = selectedBank.getWorldPoint();
+        if (bankLocation != null) {
+            Microbot.log("Web walking starting. Traveling to " + selectedBank.getName() + ".");
+            Rs2Walker.walkTo(bankLocation);
+        }
+    }
+
+    public void handleTravelToSlayerMaster() {
+        SlayerMasters selectedSlayerMaster = panel.getSelectedSlayerMaster();
+        WorldPoint slayerMasterLocation = selectedSlayerMaster.getWorldPoint();
+        if (slayerMasterLocation != null) {
+            Microbot.log("Web walking starting. Traveling to " + selectedSlayerMaster.getName() + ".");
+            Rs2Walker.walkTo(slayerMasterLocation);
+        }
+    }
+
+    public void handleTravelToFarmingLocation() {
+        String locationName = panel.getSelectedFarmingLocationName();
+        WorldPoint farmingLocation = panel.getSelectedFarmingLocation();
+        if (farmingLocation != null) {
+            Microbot.log("Web walking starting. Traveling to " + locationName.charAt(0) + locationName.substring(1).toLowerCase() + ".");
+            Rs2Walker.walkTo(farmingLocation);
         }
     }
 
@@ -643,5 +745,41 @@ public class ShortestPathPlugin extends Plugin implements KeyListener {
     @Override
     public void keyReleased(KeyEvent e) {
 
+    }
+    void stopTraveling() {
+
+        Rs2Walker.setTarget(null);
+
+        synchronized(pathfinderMutex) {
+            if (pathfinder != null) {
+                pathfinder.cancel();
+            }
+            setPathfinder(null);
+            if (pathfinderFuture != null) {
+                pathfinderFuture.cancel(true);
+            }
+        }
+
+        Microbot.getWorldMapPointManager().remove(getMarker());
+        setMarker(null);
+        setStartPointSet(false);
+
+        if (Microbot.getClientThread().scheduledFuture != null) {
+            Microbot.getClientThread().scheduledFuture.cancel(true);
+        }
+
+        Player localPlayer = client.getLocalPlayer();
+        if (localPlayer != null) {
+            WorldPoint currentLocation = localPlayer.getWorldLocation();
+            setLastLocation(currentLocation);
+
+            configManager.setConfiguration(CONFIG_GROUP, "travelToCustomLocation", false);
+            configManager.setConfiguration(CONFIG_GROUP, "travelToBank", false);
+            configManager.setConfiguration(CONFIG_GROUP, "travelToSlayerMaster", false);
+
+            Rs2Walker.currentTarget = null;
+
+            Microbot.log("Web walking stopping...");
+        }
     }
 }

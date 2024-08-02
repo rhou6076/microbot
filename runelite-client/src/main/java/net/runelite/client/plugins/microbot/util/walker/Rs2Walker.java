@@ -41,7 +41,7 @@ public class Rs2Walker {
     static int stuckCount = 0;
     static WorldPoint lastPosition;
     static int idle = 0;
-    static WorldPoint currentTarget;
+    public static WorldPoint currentTarget;
     static int nextWalkingDistance = 10;
 
     public static boolean walkTo(WorldArea area, int distanceThreshold) {
